@@ -140,9 +140,20 @@ def bar_color(val):
 
 
 # ── HEADER ───────────────────────────────────────────────────
+import base64
+
+def get_image_base64(path):
+    with open(path, "rb") as f:
+        return base64.b64encode(f.read()).decode()
+
+logo = get_image_base64("logo.png")
+
 st.markdown(f"""
 <div class="dash-header">
-  <h1>Churn-a-nator · Prioritisation Dashboard</h1>
+  <div style="display:flex; align-items:center; gap:1rem;">
+    <img src="data:image/png;base64,{logo}" style="height:42px; width:42px; border-radius:50%;">
+    <h1>Churn-a-nator · Prioritisation Dashboard</h1>
+  </div>
   <span>iD Mobile &nbsp;·&nbsp; Project Lantern</span>
 </div>
 """, unsafe_allow_html=True)
