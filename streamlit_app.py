@@ -1,10 +1,11 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
+import base64
 
 # ── PAGE CONFIG ──────────────────────────────────────────────
 st.set_page_config(
-    page_title="Churn Risk Dashboard · iD Mobile",
+    page_title="Churn-a-nator · iD Mobile",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -12,6 +13,7 @@ st.set_page_config(
 # ── PALETTE ──────────────────────────────────────────────────
 TEAL        = "#0A9396"
 TEAL_LIGHT  = "#94D2BD"
+TEAL_PALE   = "#E0F4F4"
 SLATE       = "#2D3748"
 CHARCOAL    = "#1A202C"
 MUTED       = "#718096"
@@ -51,6 +53,8 @@ st.markdown(f"""
     font-size: 1.1rem; font-weight: 700; color: {CHARCOAL};
     margin-bottom: 0.2rem; padding-bottom: 0.4rem; border-bottom: 2px solid {BORDER};
   }}
+
+  /* MRR Banner */
   .mrr-banner {{
     background: linear-gradient(135deg, {CHARCOAL} 0%, #2d3f52 100%);
     border-radius: 10px; padding: 1.3rem 2rem;
@@ -61,15 +65,35 @@ st.markdown(f"""
   .mrr-eyebrow {{ font-size: 0.7rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: {TEAL}; margin-bottom: 0.3rem; }}
   .mrr-headline {{ font-size: 1.4rem; font-weight: 800; color: {WHITE}; line-height: 1.2; }}
   .mrr-sub {{ font-size: 0.82rem; color: #94A3B8; margin-top: 0.3rem; }}
-  .mrr-stat {{ text-align: center; padding: 0 1.8rem; border-left: 1px solid rgba(255,255,255,0.1); }}
-  .mrr-stat .stat-val {{ font-size: 1.6rem; font-weight: 800; color: {WHITE}; }}
-  .mrr-stat .stat-label {{ font-size: 0.68rem; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.07em; margin-top: 0.1rem; }}
+  .mrr-stat {{ text-align: center; padding: 0 1.4rem; border-left: 1px solid rgba(255,255,255,0.1); }}
+  .mrr-stat .stat-val {{ font-size: 1.5rem; font-weight: 800; color: {WHITE}; }}
+  .mrr-stat .stat-label {{ font-size: 0.65rem; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.07em; margin-top: 0.1rem; }}
+
+  /* Formula box */
+  .formula-box {{
+    background: {TEAL_PALE};
+    border: 1px solid {TEAL};
+    border-radius: 8px;
+    padding: 0.65rem 1.2rem;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+  }}
+  .formula-label {{ font-size: 0.7rem; font-weight: 700; color: {TEAL}; text-transform: uppercase; letter-spacing: 0.08em; flex-shrink: 0; }}
+  .formula-text {{ font-size: 0.88rem; color: {SLATE}; font-family: 'Courier New', monospace; }}
+  .formula-note {{ font-size: 0.78rem; color: {MUTED}; font-style: italic; }}
+
+  /* Chart cards */
   .chart-card {{
     background: {WHITE}; border-radius: 10px;
     padding: 1.1rem 1.1rem 0.4rem; box-shadow: 0 1px 4px rgba(0,0,0,0.06); margin-bottom: 0.5rem;
   }}
   .chart-title {{ font-size: 0.78rem; font-weight: 700; color: {MUTED}; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.1rem; }}
   .chart-insight {{ font-size: 0.82rem; color: {SLATE}; font-style: italic; margin-bottom: 0.6rem; line-height: 1.45; }}
+
+  /* Risk callout */
   .risk-callout {{
     background: linear-gradient(135deg, #fff5f5 0%, {WHITE} 100%);
     border-left: 5px solid {RED}; border-radius: 10px;
@@ -78,6 +102,8 @@ st.markdown(f"""
   .risk-label {{ font-size: 0.68rem; font-weight: 700; color: {RED}; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 0.25rem; }}
   .risk-number {{ font-size: 2.4rem; font-weight: 800; color: {RED}; line-height: 1; }}
   .risk-desc {{ font-size: 0.85rem; color: {SLATE}; margin-top: 0.3rem; line-height: 1.55; }}
+
+  /* Insight cards */
   .insight-card {{
     background: {WHITE}; border-radius: 10px; padding: 0.9rem 1.1rem;
     box-shadow: 0 1px 4px rgba(0,0,0,0.06); border-left: 4px solid {TEAL};
@@ -86,12 +112,31 @@ st.markdown(f"""
   .insight-icon {{ font-size: 1.15rem; line-height: 1.4; flex-shrink: 0; }}
   .insight-title {{ font-weight: 700; font-size: 0.86rem; color: {CHARCOAL}; }}
   .insight-body {{ font-size: 0.8rem; color: {MUTED}; margin-top: 0.12rem; line-height: 1.5; }}
+
+  /* Action cards */
   .action-card {{
     background: {WHITE}; border-radius: 10px; padding: 0.9rem 1.1rem;
     box-shadow: 0 1px 4px rgba(0,0,0,0.06); border-top: 3px solid {TEAL_LIGHT}; margin-bottom: 0.6rem;
   }}
   .action-title {{ font-weight: 700; font-size: 0.86rem; color: {CHARCOAL}; }}
   .action-body {{ font-size: 0.8rem; color: {MUTED}; margin-top: 0.12rem; line-height: 1.5; }}
+
+  /* Roadmap items */
+  .roadmap-item {{
+    display: flex; gap: 0.8rem; align-items: flex-start;
+    padding: 0.55rem 0; border-bottom: 1px solid {BORDER};
+  }}
+  .roadmap-item:last-child {{ border-bottom: none; }}
+  .roadmap-badge {{
+    font-size: 0.62rem; font-weight: 700; letter-spacing: 0.07em;
+    padding: 0.13rem 0.45rem; border-radius: 4px; flex-shrink: 0; margin-top: 0.05rem;
+  }}
+  .badge-v2 {{ background: {TEAL_PALE}; color: #065F46; }}
+  .badge-v3 {{ background: {AMBER_PALE}; color: #92400E; }}
+  .roadmap-title {{ font-weight: 700; font-size: 0.84rem; color: {CHARCOAL}; }}
+  .roadmap-body {{ font-size: 0.8rem; color: {MUTED}; margin-top: 0.1rem; line-height: 1.45; }}
+
+  /* Assumption rows */
   .assumption-row {{
     display: flex; gap: 0.7rem; align-items: flex-start;
     padding: 0.5rem 0; border-bottom: 1px solid {BORDER};
@@ -105,13 +150,18 @@ st.markdown(f"""
   .badge-missing {{ background: {RED_PALE}; color: #991B1B; }}
   .badge-valid {{ background: #D1FAE5; color: #065F46; }}
   .assume-text {{ font-size: 0.8rem; color: {SLATE}; line-height: 1.5; }}
+
+  /* Upload */
   .upload-box {{
     background: {WHITE}; border: 2px dashed {BORDER}; border-radius: 12px;
     padding: 2.5rem; text-align: center; margin: 2rem auto; max-width: 500px;
   }}
   .upload-box h3 {{ color: {CHARCOAL}; font-size: 1rem; margin-bottom: 0.3rem; }}
   .upload-box p {{ color: {MUTED}; font-size: 0.83rem; }}
+
   .divider {{ border: none; border-top: 1px solid {BORDER}; margin: 1.5rem 0; }}
+
+  /* Sidebar */
   [data-testid="stSidebar"] {{ background: {CHARCOAL} !important; }}
   [data-testid="stSidebar"] * {{ color: {WHITE} !important; }}
   [data-testid="stSidebar"] hr {{ border-color: rgba(255,255,255,0.1) !important; }}
@@ -140,18 +190,17 @@ def bar_color(val):
 
 
 # ── HEADER ───────────────────────────────────────────────────
-import base64
-
-def get_image_base64(path):
-    with open(path, "rb") as f:
-        return base64.b64encode(f.read()).decode()
-
-logo = get_image_base64("logo.png")
+try:
+    with open("logo.png", "rb") as f:
+        logo_b64 = base64.b64encode(f.read()).decode()
+    logo_html = f'<img src="data:image/png;base64,{logo_b64}" style="height:42px; width:42px; border-radius:50%; object-fit:cover;">'
+except FileNotFoundError:
+    logo_html = ""
 
 st.markdown(f"""
 <div class="dash-header">
   <div style="display:flex; align-items:center; gap:1rem;">
-    <img src="data:image/png;base64,{logo}" style="height:42px; width:42px; border-radius:50%;">
+    {logo_html}
     <h1>Churn-a-nator · Prioritisation Dashboard</h1>
   </div>
   <span>iD Mobile &nbsp;·&nbsp; Project Lantern</span>
@@ -178,36 +227,41 @@ df['tenure_group'] = pd.cut(
     labels=['0–12 mo', '13–24 mo', '25–48 mo', '49–72 mo']
 )
 
-# ── SIDEBAR ───────────────────────────────────────────────────
+# ── SIDEBAR ──────────────────────────────────────────────────
 with st.sidebar:
-    st.markdown(f"<div style='padding:0.5rem 0 0.8rem'><div style='font-size:0.68rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:{TEAL};margin-bottom:0.25rem;'>iD Mobile</div><div style='font-size:1rem;font-weight:700;color:white;'>Churn Dashboard</div></div>", unsafe_allow_html=True)
+    st.markdown(f"<div style='padding:0.5rem 0 0.8rem'><div style='font-size:0.68rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:{TEAL};margin-bottom:0.25rem;'>iD Mobile</div><div style='font-size:1rem;font-weight:700;color:white;'>Churn-a-nator</div></div>", unsafe_allow_html=True)
     st.markdown("---")
     st.markdown(f"<div style='font-size:0.68rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:{TEAL};margin-bottom:0.5rem;'>Filters</div>", unsafe_allow_html=True)
-    contract_filter = st.selectbox("Contract Type",   ["All"] + sorted(df['Contract'].unique().tolist()))
-    tech_filter     = st.selectbox("Tech Support",    ["All"] + sorted(df['TechSupport'].unique().tolist()))
-    payment_filter  = st.selectbox("Payment Method",  ["All"] + sorted(df['PaymentMethod'].unique().tolist()))
+    contract_filter = st.selectbox("Contract Type",  ["All"] + sorted(df['Contract'].unique().tolist()))
+    tech_filter     = st.selectbox("Tech Support",   ["All"] + sorted(df['TechSupport'].unique().tolist()))
+    payment_filter  = st.selectbox("Payment Method", ["All"] + sorted(df['PaymentMethod'].unique().tolist()))
     tenure_range    = st.slider("Tenure (months)", 0, 72, (0, 72))
     st.markdown("---")
-    st.markdown(f"<div style='font-size:0.72rem;color:#94A3B8;line-height:1.6;'>High risk threshold: >{HIGH_RISK:.0%} churn rate.<br>Filters apply across all views.</div>", unsafe_allow_html=True)
+    st.markdown(f"<div style='font-size:0.72rem;color:#94A3B8;line-height:1.6;'>🔴 High risk: ≥{HIGH_RISK:.0%} churn<br>🟡 Medium: {MEDIUM_RISK:.0%}–{HIGH_RISK:.0%} churn<br>🟢 Low: &lt;{MEDIUM_RISK:.0%} churn<br><br>Filters apply across all views.</div>", unsafe_allow_html=True)
 
-# ── APPLY FILTERS ────────────────────────────────────────────
+# ── APPLY FILTERS ─────────────────────────────────────────────
 dff = df.copy()
 if contract_filter != "All": dff = dff[dff['Contract']      == contract_filter]
 if tech_filter     != "All": dff = dff[dff['TechSupport']   == tech_filter]
 if payment_filter  != "All": dff = dff[dff['PaymentMethod'] == payment_filter]
 dff = dff[(dff['tenure'] >= tenure_range[0]) & (dff['tenure'] <= tenure_range[1])]
 
-# ── KPIs ─────────────────────────────────────────────────────
-churn_rate     = dff['Churn'].mean()
-churned_count  = int(dff['Churn'].sum())
+# ── KPIs ──────────────────────────────────────────────────────
 total          = len(dff)
+churned_count  = int(dff['Churn'].sum())
+churn_rate     = dff['Churn'].mean()
+retention_rate = 1 - churn_rate
 avg_charge     = dff['MonthlyCharges'].mean()
 mrr_at_risk    = dff[dff['Churn'] == 1]['MonthlyCharges'].sum()
 
-high_risk = dff[(dff['Contract'] == 'Month-to-month') & (dff['TechSupport'] == 'No') & (dff['tenure'] <= 12)]
-hr_rate   = high_risk['Churn'].mean() if len(high_risk) else 0
-hr_count  = len(high_risk)
-hr_mrr    = high_risk[high_risk['Churn'] == 1]['MonthlyCharges'].sum()
+high_risk = dff[
+    (dff['Contract'] == 'Month-to-month') &
+    (dff['TechSupport'] == 'No') &
+    (dff['tenure'] <= 12)
+]
+hr_rate  = high_risk['Churn'].mean() if len(high_risk) else 0
+hr_count = len(high_risk)
+hr_mrr   = high_risk[high_risk['Churn'] == 1]['MonthlyCharges'].sum()
 
 # ── MRR BANNER ───────────────────────────────────────────────
 st.markdown(f"""
@@ -221,8 +275,20 @@ st.markdown(f"""
     </div>
   </div>
   <div class="mrr-stat"><div class="stat-val">{churn_rate:.1%}</div><div class="stat-label">Churn Rate</div></div>
+  <div class="mrr-stat"><div class="stat-val">{retention_rate:.1%}</div><div class="stat-label">Retention Rate</div></div>
   <div class="mrr-stat"><div class="stat-val">{churned_count:,}</div><div class="stat-label">Churned</div></div>
   <div class="mrr-stat"><div class="stat-val">{total:,}</div><div class="stat-label">In View</div></div>
+</div>
+""", unsafe_allow_html=True)
+
+# ── FORMULA BOX ──────────────────────────────────────────────
+st.markdown(f"""
+<div class="formula-box">
+  <span class="formula-label">📊 Key Formulas</span>
+  <span class="formula-text">Churn Rate = Customers lost ÷ Customers at start of period × 100</span>
+  <span class="formula-text">&nbsp;·&nbsp;</span>
+  <span class="formula-text">Retention Rate = 1 − Churn Rate</span>
+  <span class="formula-note">Tracked monthly to identify trends early</span>
 </div>
 """, unsafe_allow_html=True)
 
@@ -237,7 +303,7 @@ v1c1, v1c2 = st.columns(2)
 
 with v1c1:
     d = dff.groupby('tenure_group', observed=True).agg(
-        churn_rate=('Churn','mean'), count=('Churn','count'), churned=('Churn','sum')
+        churn_rate=('Churn', 'mean'), count=('Churn', 'count'), churned=('Churn', 'sum')
     ).reset_index()
     d['pct'] = (d['churn_rate'] * 100).round(1)
     fig = go.Figure(go.Bar(
@@ -245,7 +311,7 @@ with v1c1:
         marker_color=[bar_color(v) for v in d['churn_rate']],
         text=[f"{v}%" for v in d['pct']], textposition='outside',
         textfont=dict(size=11, color=CHARCOAL),
-        customdata=d[['count','churned']].values,
+        customdata=d[['count', 'churned']].values,
         hovertemplate="<b>%{x}</b><br>Churn rate: %{y:.1f}%<br>Customers: %{customdata[0]:,}<br>Churned: %{customdata[1]:,}<extra></extra>",
     ))
     l = base_layout(); l['yaxis']['title'] = "Churn Rate (%)"; l['yaxis']['range'] = [0, d['pct'].max() * 1.3]
@@ -256,7 +322,7 @@ with v1c1:
 
 with v1c2:
     d = dff.groupby('Contract').agg(
-        churn_rate=('Churn','mean'), count=('Churn','count'), churned=('Churn','sum')
+        churn_rate=('Churn', 'mean'), count=('Churn', 'count'), churned=('Churn', 'sum')
     ).reset_index().sort_values('churn_rate', ascending=False)
     d['pct'] = (d['churn_rate'] * 100).round(1)
     fig = go.Figure(go.Bar(
@@ -264,7 +330,7 @@ with v1c2:
         marker_color=[bar_color(v) for v in d['churn_rate']],
         text=[f"{v}%" for v in d['pct']], textposition='outside',
         textfont=dict(size=11, color=CHARCOAL),
-        customdata=d[['count','churned']].values,
+        customdata=d[['count', 'churned']].values,
         hovertemplate="<b>%{x}</b><br>Churn rate: %{y:.1f}%<br>Customers: %{customdata[0]:,}<br>Churned: %{customdata[1]:,}<extra></extra>",
     ))
     l = base_layout(); l['yaxis']['title'] = "Churn Rate (%)"; l['yaxis']['range'] = [0, d['pct'].max() * 1.3]
@@ -284,7 +350,7 @@ v2c1, v2c2 = st.columns(2)
 
 with v2c1:
     d = dff.groupby('PaymentMethod').agg(
-        churn_rate=('Churn','mean'), count=('Churn','count'), churned=('Churn','sum')
+        churn_rate=('Churn', 'mean'), count=('Churn', 'count'), churned=('Churn', 'sum')
     ).reset_index().sort_values('churn_rate', ascending=True)
     d['pct'] = (d['churn_rate'] * 100).round(1)
     d['short'] = d['PaymentMethod'].str.replace(r'\s*\(.*\)', '', regex=True).str.strip()
@@ -293,7 +359,7 @@ with v2c1:
         marker_color=[bar_color(v) for v in d['churn_rate']],
         text=[f"{v}%" for v in d['pct']], textposition='outside',
         textfont=dict(size=11, color=CHARCOAL),
-        customdata=d[['count','churned']].values,
+        customdata=d[['count', 'churned']].values,
         hovertemplate="<b>%{y}</b><br>Churn rate: %{x:.1f}%<br>Customers: %{customdata[0]:,}<br>Churned: %{customdata[1]:,}<extra></extra>",
     ))
     l = base_layout()
@@ -306,7 +372,7 @@ with v2c1:
 
 with v2c2:
     d = dff.groupby('TechSupport').agg(
-        churn_rate=('Churn','mean'), count=('Churn','count'), churned=('Churn','sum')
+        churn_rate=('Churn', 'mean'), count=('Churn', 'count'), churned=('Churn', 'sum')
     ).reset_index().sort_values('churn_rate', ascending=False)
     d['pct'] = (d['churn_rate'] * 100).round(1)
     fig = go.Figure(go.Bar(
@@ -314,7 +380,7 @@ with v2c2:
         marker_color=[bar_color(v) for v in d['churn_rate']],
         text=[f"{v}%" for v in d['pct']], textposition='outside',
         textfont=dict(size=11, color=CHARCOAL),
-        customdata=d[['count','churned']].values,
+        customdata=d[['count', 'churned']].values,
         hovertemplate="<b>%{x}</b><br>Churn rate: %{y:.1f}%<br>Customers: %{customdata[0]:,}<br>Churned: %{customdata[1]:,}<extra></extra>",
     ))
     l = base_layout(); l['yaxis']['title'] = "Churn Rate (%)"; l['yaxis']['range'] = [0, d['pct'].max() * 1.3]
@@ -324,7 +390,7 @@ with v2c2:
     st.markdown("</div>", unsafe_allow_html=True)
 
 # Trend line
-trend = dff.groupby('tenure').agg(churn_rate=('Churn','mean'), count=('Churn','count')).reset_index()
+trend = dff.groupby('tenure').agg(churn_rate=('Churn', 'mean'), count=('Churn', 'count')).reset_index()
 trend = trend[trend['count'] >= 5]
 trend['smooth'] = trend['churn_rate'].rolling(window=4, min_periods=1, center=True).mean()
 trend['pct'] = (trend['smooth'] * 100).round(1)
@@ -336,10 +402,12 @@ fig.add_trace(go.Scatter(
     fill='tozeroy', fillcolor="rgba(10,147,150,0.08)",
     hovertemplate="Month %{x}: %{y:.1f}% churn rate<extra></extra>",
 ))
-fig.add_vrect(x0=0, x1=12, fillcolor=RED, opacity=0.05, line_width=0,
-              annotation_text="High-risk window (0–12 mo)",
-              annotation_position="top left",
-              annotation_font=dict(color=RED, size=10))
+fig.add_vrect(
+    x0=0, x1=12, fillcolor=RED, opacity=0.05, line_width=0,
+    annotation_text="High-risk window (0–12 mo)",
+    annotation_position="top left",
+    annotation_font=dict(color=RED, size=10)
+)
 l = base_layout(height=230)
 l['xaxis'].update(title="Tenure (months)", range=[0, 72])
 l['yaxis'].update(title="Churn Rate (%)", range=[0, trend['pct'].max() * 1.3])
@@ -383,23 +451,36 @@ with v3c2:
         else ('🟡 Medium' if x['churn_rate'] >= MEDIUM_RISK else '🟢 Low'), axis=1
     )
     grouped = grouped.sort_values('churn_rate', ascending=False)
-    grouped = grouped.rename(columns={'tenure_group': 'Tenure Band', 'Contract': 'Contract Type', 'customer_count': 'Customers'})
-    st.dataframe(grouped[['Priority', 'Tenure Band', 'Contract Type', 'Customers', 'Churn Rate']],
-                 use_container_width=True, hide_index=True)
+    grouped = grouped.rename(columns={
+        'tenure_group': 'Tenure Band',
+        'Contract': 'Contract Type',
+        'customer_count': 'Customers'
+    })
+    st.dataframe(
+        grouped[['Priority', 'Tenure Band', 'Contract Type', 'Customers', 'Churn Rate']],
+        use_container_width=True, hide_index=True
+    )
 
 st.markdown("<hr class='divider'>", unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════
-# INSIGHTS
+# KEY INSIGHTS
 # ════════════════════════════════════════════════════════════
 st.markdown("<div class='section-heading'>Key Insights</div>", unsafe_allow_html=True)
 
 insights = [
-    ("📉", "Tenure is the strongest predictor",       "Customers in their first 12 months churn at 47% — five times higher than those with 4+ years. Early lifecycle is where the battle is won or lost."),
-    ("📋", "Contract type creates a 15× difference",  "Month-to-month customers churn at 43%. Two-year customers at 2.8%. Moving customers to longer contracts is the single highest-leverage retention action."),
-    ("💳", "Electronic check is a red flag",          "Customers paying by electronic check churn at 45% — nearly 3× the rate of those on automatic payments. A strong proxy for payment friction and low commitment."),
-    ("🛠️", "No tech support = 2.7× churn risk",      "Customers without tech support churn at 42% vs 15% with it. Contact centre contacts are a leading signal, not just a cost driver."),
-    ("⚠️", "Risk compounds at the intersection",      "New, unsupported, month-to-month customers hit 61% churn. This cohort of ~1,300 should be the immediate focus for proactive retention outreach."),
+    ("📉", "Tenure is the strongest predictor",
+     "Customers in their first 12 months churn at 47% — five times higher than those with 4+ years. Early lifecycle is where the battle is won or lost."),
+    ("📋", "Contract type creates a 15× difference",
+     "Month-to-month customers churn at 43%. Two-year customers at 2.8%. Moving customers to longer contracts is the single highest-leverage retention action."),
+    ("💳", "Electronic check is a red flag",
+     "Customers paying by electronic check churn at 45% — nearly 3× the rate of those on automatic payments. A strong proxy for payment friction and low commitment."),
+    ("🛠️", "No tech support = 2.7× churn risk",
+     "Customers without tech support churn at 42% vs 15% with it. Contact centre contacts are a leading signal, not just a cost driver."),
+    ("⚠️", "Risk compounds at the intersection",
+     "New, unsupported, month-to-month customers hit 61% churn. This cohort of ~1,300 should be the immediate focus for proactive retention outreach."),
+    ("💰", "Revenue impact is material",
+     "Monitoring churn is not just about preventing losses — it protects CLV, enables accurate revenue forecasting, and ensures retention spend is directed where it has the highest return."),
 ]
 
 ic1, ic2 = st.columns(2)
@@ -410,15 +491,19 @@ for i, (icon, title, body) in enumerate(insights):
 st.markdown("<hr class='divider'>", unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════
-# ACTIONS
+# POTENTIAL ACTIONS
 # ════════════════════════════════════════════════════════════
 st.markdown("<div class='section-heading'>Potential Actions</div>", unsafe_allow_html=True)
 
 actions = [
-    ("Improve early-lifecycle onboarding",    "Target the 0–12 month cohort with structured onboarding comms. Reduce time-to-value before the first renewal decision point."),
-    ("Incentivise contract upgrades",         "Offer month-to-month customers a well-timed incentive to move to 12-month contracts. The churn delta easily justifies meaningful acquisition cost."),
-    ("Proactive tech support outreach",       "Flag customers with multiple contacts and no resolution. Intervene before they disengage entirely."),
-    ("Investigate electronic check segment",  "Explore whether payment friction correlates with churn intent. Nudge toward automatic payment setup at onboarding."),
+    ("Improve early-lifecycle onboarding",
+     "Target the 0–12 month cohort with structured onboarding comms. Reduce time-to-value before the first renewal decision point."),
+    ("Incentivise contract upgrades",
+     "Offer month-to-month customers a well-timed incentive to move to 12-month contracts. The churn delta easily justifies meaningful acquisition cost."),
+    ("Proactive tech support outreach",
+     "Flag customers with multiple contacts and no resolution. Intervene before they disengage entirely."),
+    ("Investigate electronic check segment",
+     "Explore whether payment friction correlates with churn intent. Nudge toward automatic payment setup at onboarding."),
 ]
 
 ac1, ac2 = st.columns(2)
@@ -429,18 +514,50 @@ for i, (title, body) in enumerate(actions):
 st.markdown("<hr class='divider'>", unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════
-# ASSUMPTIONS
+# V2 ROADMAP
+# ════════════════════════════════════════════════════════════
+with st.expander("🗺️  What would we prioritise next? · v2 Roadmap"):
+    st.markdown(f"<div style='font-size:0.82rem;color:{MUTED};margin-bottom:0.8rem;line-height:1.6;'>This view is intentionally built for clarity over complexity — interpretable indicators a CRM manager can act on today. Here's how it evolves once the baseline is trusted.</div>", unsafe_allow_html=True)
+
+    roadmap = [
+        ("V2", "badge-v2", "Connect real Contact Centre contact volume",
+         "Replace the TechSupport proxy with actual contact frequency per customer from Contact Centre data. This sharpens the early warning signal significantly."),
+        ("V2", "badge-v2", "Add direct debit failure data from billing",
+         "DD failure rates are a strong leading indicator not captured in this dataset. Linking iD billing signals would meaningfully improve cohort accuracy."),
+        ("V2", "badge-v2", "Engagement signals — usage and login frequency",
+         "Drops in data usage or app login activity often predict churn before it happens. A v2 priority once product usage data is accessible."),
+        ("V2", "badge-v2", "NPS as a qualitative complement",
+         "Combining quantitative churn signals with Net Promoter Score gives a fuller picture — low NPS often precedes churn by weeks."),
+        ("V3", "badge-v3", "Predictive layer — logistic regression or decision tree",
+         "Once the business trusts the interpretable baseline, add a risk score per customer rather than a cohort view. Enables more precise CRM targeting."),
+        ("V3", "badge-v3", "Trigger-based alerts into CRM campaign tools",
+         "Automate flags when a customer crosses a risk threshold — feeding directly into CRM so retention outreach is proactive, not scheduled."),
+    ]
+
+    for ver, badge_cls, title, body in roadmap:
+        st.markdown(f"""
+        <div class="roadmap-item">
+          <span class="roadmap-badge {badge_cls}">{ver}</span>
+          <div>
+            <div class="roadmap-title">{title}</div>
+            <div class="roadmap-body">{body}</div>
+          </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+# ════════════════════════════════════════════════════════════
+# DATA ASSUMPTIONS
 # ════════════════════════════════════════════════════════════
 with st.expander("📋  Data assumptions & what I'd validate with iD Mobile"):
     for flag, cls, text in [
-        ("ASSUME",  "badge-assume",   "'TechSupport = No' used as proxy for contact frequency. Validate: match against CRM contact logs by customer ID."),
-        ("ASSUME",  "badge-assume",   "Tenure bands assumed business-meaningful. Validate with CRM: do retention campaigns already segment by these cohorts?"),
-        ("ASSUME",  "badge-assume",   "Electronic check treated as proxy for payment risk. Validate against direct debit failure rates in iD billing data."),
-        ("MISSING", "badge-missing",  "Actual contact volume not in dataset. Production version would link to Contact Centre data for true contact frequency per customer."),
-        ("MISSING", "badge-missing",  "No payment failure data. Direct debit failure signals from iD billing would likely be a strong additional early warning indicator."),
-        ("MISSING", "badge-missing",  "No product usage data (data usage, call minutes). Declining usage before churn is a key signal this dataset cannot capture."),
-        ("VALID",   "badge-valid",    "Churn flag, contract type, and tenure are structurally equivalent to iD Mobile's subscription data model. Findings are directionally accurate."),
-        ("VALID",   "badge-valid",    "Overall churn rate of 26.5% is higher than typical UK MVNO benchmarks — treat as illustrative of pattern, not absolute rate."),
+        ("ASSUME",  "badge-assume",  "'TechSupport = No' used as proxy for contact frequency. Validate: match against CRM contact logs by customer ID."),
+        ("ASSUME",  "badge-assume",  "Tenure bands assumed business-meaningful. Validate with CRM: do retention campaigns already segment by these cohorts?"),
+        ("ASSUME",  "badge-assume",  "Electronic check treated as proxy for payment risk. Validate against direct debit failure rates in iD billing data."),
+        ("MISSING", "badge-missing", "Actual contact volume not in dataset. Production version would link to Contact Centre data for true contact frequency per customer."),
+        ("MISSING", "badge-missing", "No payment failure data. Direct debit failure signals from iD billing would likely be a strong additional early warning indicator."),
+        ("MISSING", "badge-missing", "No product usage data (data usage, call minutes). Declining usage before churn is a key signal this dataset cannot capture."),
+        ("VALID",   "badge-valid",   "Churn flag, contract type, and tenure are structurally equivalent to iD Mobile's subscription data model. Findings are directionally accurate."),
+        ("VALID",   "badge-valid",   "Overall churn rate of 26.5% is higher than typical UK MVNO benchmarks — treat as illustrative of pattern, not absolute rate."),
     ]:
         st.markdown(f'<div class="assumption-row"><span class="assume-badge {cls}">{flag}</span><span class="assume-text">{text}</span></div>', unsafe_allow_html=True)
 
