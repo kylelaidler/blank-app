@@ -297,7 +297,7 @@ st.markdown(f"""
 <div class="dash-header">
   <div style="display:flex;align-items:center;gap:1rem;">
     {logo_html}
-    <h1>Churn-a-nator - Terminating Churn</h1>
+    <h1>Churn-a-nator >> Terminating Churn</h1>
   </div>
   <span>iD Mobile &nbsp;·&nbsp; Project Lantern</span>
 </div>
